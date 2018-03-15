@@ -1,5 +1,8 @@
 module NeuralStyles
 
-# package code goes here
+include("pre.jl")
+include("styles.jl")
+
+export train
 
 end # module
