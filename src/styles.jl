@@ -64,7 +64,7 @@ function compute_cost(m, content, style, generated, STYLE_LAYERS)
     
     J_content = compute_content_cost(act_content, act_generated)
     println("Content cost = $J_content")
-    J_style = compute_style_cost(act_content, act_generated, STYLE_LAYERS)
+    J_style = compute_style_cost(act_style, act_generated, STYLE_LAYERS)
     println("Style cost = $J_style")
     J = compute_total_cost(J_content, J_style) 
     println("Total cost = $J")
