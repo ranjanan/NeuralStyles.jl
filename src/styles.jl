@@ -30,7 +30,6 @@ function train(con_path, sty_path, n_epoch = 140)
     # generated = rand(eltype(content), size(content)) * 256
     generated = 0.4f0*content + gpu(0.6f0*rand(-20.0f0:0.01f0:20.0f0, size(content)))
     generated = generated |> gpu
-    copy_gen = copy(generated)
     generated = generated |> param
     
     m = VGG19() |> gpu
@@ -48,7 +47,7 @@ function train(con_path, sty_path, n_epoch = 140)
     loss() = compute_cost(m, content, style, generated, STYLE_LAYERS)
 
     @epochs n_epoch Flux.train!(loss, 
-                Iterators.repeated((), 1), ADAM(generated))
+                                Iterators.repeated((), 1), ADAM([generated], 2))
 
     output = generated.data |> collect |> postprocess_img
     output = imresize(output, orig_size)
