@@ -1,21 +1,12 @@
-module Styles 
 
-include("pre.jl")
-
-using Metalhead
-using Images
-using Optim
-using Flux
-using CuArrays
-import Flux: @epochs
-CuArrays.allowscalar(false)
 
 export train
 
 """
 Main training driver function
 """
-function train(con_path, sty_path, n_epoch = 140)
+function train(con_path, sty_path, n_epoch = 140;
+              lr = 2., noise = 0.6f0)
 
     info("Loading data ....")
     content = load(con_path) 
@@ -28,11 +19,15 @@ function train(con_path, sty_path, n_epoch = 140)
 
     # Random starting point 
     # generated = rand(eltype(content), size(content)) * 256
-    generated = 0.4f0*content + gpu(0.6f0*rand(-20.0f0:0.01f0:20.0f0, size(content)))
+    noise = Float32(noise)
+    generated = (1-noise)*content + gpu(noise*rand(-20.0f0:0.01f0:20.0f0, size(content)))
     generated = generated |> gpu
     generated = generated |> param
-    
+
     m = VGG19() |> gpu
+
+    act_content = forward_pass(m, content)
+    act_style = forward_pass(m, style)
 
     STYLE_LAYERS = 
     [(1,  0.2),
@@ -44,24 +39,22 @@ function train(con_path, sty_path, n_epoch = 140)
 
     #optimize(x -> compute_cost(m, content, style, x, STYLE_LAYERS), 
     #         generated, GradientDescent(), Optim.Options(show_trace = true, iterations = 2))
-    loss() = compute_cost(m, content, style, generated, STYLE_LAYERS)
+    loss() = compute_cost(m, act_content, act_style, generated, STYLE_LAYERS)
 
     @epochs n_epoch Flux.train!(loss, 
-                                Iterators.repeated((), 1), ADAM([generated], 2))
+                                Iterators.repeated((), 1), ADAM([generated], lr))
 
     output = generated.data |> collect |> postprocess_img
     output = imresize(output, orig_size)
 
-    save("output.jpg", output)
+    save("$(con_path)_output.jpg", output)
 
     output
 end
 
-function compute_cost(m, content, style, generated, STYLE_LAYERS)
-    act_content = forward_pass(m, content)
-    act_style = forward_pass(m, style)
+function compute_cost(m, act_content, act_style, generated, STYLE_LAYERS)
+
     act_generated = forward_pass(m, generated)
-    
     J_content = compute_content_cost(act_content, act_generated)
     println("Content cost = $J_content")
     J_style = compute_style_cost(act_style, act_generated, STYLE_LAYERS)
